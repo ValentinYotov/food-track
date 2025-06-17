@@ -1,164 +1,213 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../models/user_profile.dart';
+import '../services/user_profile_service.dart';
+import '../services/meal_plan_generator.dart';
 
-class MealPlanScreen extends StatelessWidget {
-  const MealPlanScreen({super.key});
+class MealPlanScreen extends StatefulWidget {
+  const MealPlanScreen({Key? key}) : super(key: key);
+
+  @override
+  State<MealPlanScreen> createState() => _MealPlanScreenState();
+}
+
+class _MealPlanScreenState extends State<MealPlanScreen> {
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _mealPlanData;
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMealPlan();
+  }
+
+  Future<void> _loadMealPlan() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      // Симулираме timeout за AI (10 сек.)
+      final userProfileService = UserProfileService();
+      final profile = await userProfileService.getUserProfile();
+      setState(() => _profile = profile);
+      if (profile == null) {
+        setState(() {
+          _error = 'Потребителският профил не е намерен. Моля, попълнете целите си.';
+          _isLoading = false;
+        });
+        return;
+      }
+      final mealPlanGenerator = MealPlanGenerator(userProfileService);
+      final mealPlanData = await mealPlanGenerator.generateMealPlan(profile).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('AI отговорът отне твърде дълго. Опитайте отново.'),
+      );
+      setState(() {
+        _mealPlanData = mealPlanData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF8A0720), // Dark Red
-              Color(0xFF4C004C), // Dark Purple
-            ],
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.red.shade700,
+        elevation: 0,
+        title: const Text('Meal Plan', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _isLoading ? null : _loadMealPlan,
+            tooltip: 'Генерирай отново',
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 48.0, left: 24.0, right: 24.0, bottom: 24.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w300,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'Meal Plan',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.shopping_cart, color: Colors.white, size: 30),
-                          onPressed: () => context.go('/shopping-list'),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.settings, color: Colors.white, size: 30),
-                          onPressed: () => context.go('/settings'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+        ],
+      ),
+      body: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Генерираме твоя план...', style: TextStyle(color: Colors.red.shade700)),
+                ],
               ),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(24.0),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(40.0),
-                      topRight: Radius.circular(40.0),
-                    ),
-                  ),
-                  child: ListView(
+            )
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildDaySection('Monday'),
-                      _buildDaySection('Tuesday'),
-                      _buildDaySection('Wednesday'),
-                      _buildDaySection('Thursday'),
-                      _buildDaySection('Friday'),
-                      _buildDaySection('Saturday'),
-                      _buildDaySection('Sunday'),
+                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _loadMealPlan,
+                        child: const Text('Опитай отново'),
+                      ),
                     ],
                   ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+                )
+              : _mealPlanData == null
+                  ? Center(
+                      child: Text('Няма наличен план. Попълнете целите си.',
+                          style: TextStyle(color: Colors.red.shade700)),
+                    )
+                  : _buildMealPlanView(),
     );
   }
 
-  Widget _buildDaySection(String day) {
+  Widget _buildMealPlanView() {
+    final mealPlan = _mealPlanData!['mealPlan'] as Map<String, dynamic>;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Icon(Icons.calendar_month, color: Colors.red.shade700),
+            const SizedBox(width: 8),
+            Text('Твоят седмичен план',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red.shade700)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ...mealPlan.entries.map((entry) => _buildDayCard(entry.key, entry.value)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildDayCard(String day, dynamic data) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
-      ),
-      margin: const EdgeInsets.only(bottom: 16.0),
+      color: Colors.red.shade50,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              day,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildMealItem('Breakfast', 'Oatmeal with Banana and Honey', ''), // Example meal
-            _buildMealItem('Lunch', 'Chicken Salad with Avocado', ''), // Example meal
-            _buildMealItem('Afternoon Snack', 'Apple and Almonds', ''), // Example meal
-            _buildMealItem('Dinner', 'Baked Fish with Vegetables', ''), // Example meal
+            Text(day,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red.shade700)),
+            const SizedBox(height: 8),
+            ...['breakfast', 'lunch', 'dinner', 'snacks'].where((k) => data[k] != null).map((mealType) {
+              final meal = data[mealType];
+              if (meal is List) {
+                // snacks
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: meal.map<Widget>((snack) => _buildMealTile(snack)).toList(),
+                );
+              } else {
+                return _buildMealTile(meal);
+              }
+            }).toList(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMealItem(String mealType, String mealName, String recipeId) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mealType,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  mealName,
-                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+  Widget _buildMealTile(dynamic meal) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: ListTile(
+        leading: Icon(Icons.restaurant_menu, color: Colors.red.shade400),
+        title: Text(meal['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('${meal['calories'].toStringAsFixed(0)} kcal'),
+        trailing: Icon(Icons.arrow_forward_ios, color: Colors.red.shade200, size: 16),
+        onTap: () {
+          // Може да се покаже детайл за ястието
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: Text(meal['name']),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Калории: ${meal['calories'].toStringAsFixed(0)}'),
+                  Text('Протеин: ${meal['protein'].toStringAsFixed(1)}g'),
+                  Text('Въглехидрати: ${meal['carbs'].toStringAsFixed(1)}g'),
+                  Text('Мазнини: ${meal['fat'].toStringAsFixed(1)}g'),
+                  const SizedBox(height: 8),
+                  if (meal['items'] != null)
+                    ...List.generate(meal['items'].length, (i) => Text('- ${meal['items'][i]['name']}')),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Затвори'),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Navigate to recipe details, using recipeId
-              // context.go('/recipe/$recipeId');
-            },
-            child: const Text('Recipe',
-                style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.bold)),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

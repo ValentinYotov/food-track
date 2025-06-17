@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/user_profile.dart';
+import '../services/user_profile_service.dart';
+import '../services/meal_plan_generator.dart';
+import '../services/shopping_list_generator.dart';
 
 class ShoppingListScreen extends StatefulWidget {
   const ShoppingListScreen({super.key});
@@ -8,165 +12,193 @@ class ShoppingListScreen extends StatefulWidget {
 }
 
 class _ShoppingListScreenState extends State<ShoppingListScreen> {
-  final List<Map<String, dynamic>> _items = [
-    {'name': 'Oats', 'quantity': '500g', 'checked': false},
-    {'name': 'Bananas', 'quantity': '6 pieces', 'checked': false},
-    {'name': 'Honey', 'quantity': '300g', 'checked': false},
-    {'name': 'Chicken Fillet', 'quantity': '1kg', 'checked': false},
-    {'name': 'Avocados', 'quantity': '2 pieces', 'checked': false},
-    {'name': 'Apples', 'quantity': '6 pieces', 'checked': false},
-    {'name': 'Almonds', 'quantity': '200g', 'checked': false},
-    {'name': 'Fish', 'quantity': '800g', 'checked': false},
-    {'name': 'Vegetables', 'quantity': '1kg', 'checked': false},
-  ];
+  final _userProfileService = UserProfileService();
+  final _mealPlanGenerator = MealPlanGenerator(UserProfileService());
+  final _shoppingListGenerator = ShoppingListGenerator();
+  bool _isLoading = true;
+  Map<String, List<Map<String, dynamic>>>? _shoppingList;
+  UserProfile? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShoppingList();
+  }
+
+  Future<void> _loadShoppingList() async {
+    try {
+      final profile = await _userProfileService.getUserProfile();
+      if (profile == null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
+      final mealPlanData = await _mealPlanGenerator.generateMealPlan(profile);
+      final shoppingList = await _shoppingListGenerator.generateShoppingList(
+        mealPlanData['mealPlan'],
+        profile,
+      );
+
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+          _shoppingList = shoppingList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _toggleItem(Map<String, dynamic> item) {
+    setState(() {
+      item['checked'] = !item['checked'];
+    });
+  }
+
+  Widget _buildCategorySection(String category, List<Map<String, dynamic>> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            category,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ...items.map((item) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Checkbox(
+                value: item['checked'] as bool,
+                onChanged: (_) => _toggleItem(item),
+              ),
+              title: Text(item['name']),
+              subtitle: Text(item['quantity']),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF8A0720), // Dark Red
-              Color(0xFF4C004C), // Dark Purple
-            ],
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_shoppingList == null) {
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.blue[900]!,
+                Colors.blue[800]!,
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shopping_cart,
+                  size: 64,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No Items Yet',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your shopping list will appear here once you generate a meal plan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/goals'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'SET GOALS',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 48.0, left: 24.0, right: 24.0, bottom: 24.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w300,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'Shopping List',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Colors.white, size: 30),
-                      onPressed: () {
-                        // TODO: Share shopping list
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(24.0),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(40.0),
-                      topRight: Radius.circular(40.0),
-                    ),
-                  ),
-                  child: ListView.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12.0),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 1,
-                              blurRadius: 3,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: CheckboxListTile(
-                          title: Text(
-                            item['name'],
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: item['checked'] ? Colors.grey : Colors.black87,
-                              decoration: item['checked'] ? TextDecoration.lineThrough : TextDecoration.none,
-                            ),
-                          ),
-                          subtitle: Text(
-                            item['quantity'],
-                            style: TextStyle(
-                              color: item['checked'] ? Colors.grey.shade400 : Colors.grey,
-                              decoration: item['checked'] ? TextDecoration.lineThrough : TextDecoration.none,
-                            ),
-                          ),
-                          value: item['checked'],
-                          onChanged: (bool? value) {
-                            setState(() {
-                              item['checked'] = value;
-                            });
-                          },
-                          activeColor: Color(0xFFD32F2F), // Red checkbox
-                          checkColor: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
+      );
+    }
+
+    final categories = _shoppingListGenerator.getSortedCategories(_shoppingList!);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Shopping List'),
+        backgroundColor: Colors.blue[900],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: categories.map((category) {
+            return _buildCategorySection(
+              category,
+              _shoppingList![category]!,
+            );
+          }).toList(),
         ),
       ),
-      floatingActionButton: Container(
-        height: 60,
-        width: 60,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFFD32F2F), // Red for FAB
-              Color(0xFF8B008B), // Purple for FAB
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0xFFD32F2F).withOpacity(0.5),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () {
-            // TODO: Add new item
-          },
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: const Icon(Icons.add, color: Colors.white, size: 30),
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // TODO: Implement add item functionality
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add),
       ),
     );
   }

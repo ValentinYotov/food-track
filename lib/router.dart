@@ -11,6 +11,7 @@ import 'screens/shopping_list_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/profile_screen.dart';
+import 'screens/reset_password_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -18,6 +19,7 @@ final router = GoRouter(
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isAuthRoute = state.matchedLocation == '/login' || 
                        state.matchedLocation == '/register' ||
+                       state.matchedLocation == '/reset-password' ||
                        state.matchedLocation == '/';
 
     if (!isLoggedIn && !isAuthRoute) {
@@ -42,6 +44,10 @@ final router = GoRouter(
     GoRoute(
       path: '/register',
       builder: (context, state) => const RegisterScreen(),
+    ),
+    GoRoute(
+      path: '/reset-password',
+      builder: (context, state) => const ResetPasswordScreen(),
     ),
     ShellRoute(
       builder: (context, state, child) {

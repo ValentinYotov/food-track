@@ -6,7 +6,9 @@ class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Get current user
-  User? get currentUser => _auth.currentUser;
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
 
   // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -75,6 +77,15 @@ class AuthService {
 
   // Reset password
   Future<void> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {

@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () {
-                            // TODO: Implement forgot password
+                            context.go('/reset-password');
                           },
                           child: const Text(
                             'Forgot password?',
