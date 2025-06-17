@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "628983044616",
+    "project_id": "nutrimate-13aa4",
+    "storage_bucket": "nutrimate-13aa4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:628983044616:android:e14421b88297560e63cfbd",
+        "android_client_info": {
+          "package_name": "com.example.food_track"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzq5Rh6Wm2Nfc_jFH8qPik9uxiaF7LcQ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
