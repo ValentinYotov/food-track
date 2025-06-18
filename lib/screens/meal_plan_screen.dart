@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../services/user_profile_service.dart';
 import '../services/meal_plan_generator.dart';
 
 class MealPlanScreen extends StatefulWidget {
-  const MealPlanScreen({Key? key}) : super(key: key);
+  const MealPlanScreen({super.key});
 
   @override
   State<MealPlanScreen> createState() => _MealPlanScreenState();
 }
 
 class _MealPlanScreenState extends State<MealPlanScreen> {
-  bool _isLoading = true;
-  String? _error;
-  Map<String, dynamic>? _mealPlanData;
-  UserProfile? _profile;
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _mealPlan = [];
 
   @override
   void initState() {
@@ -23,192 +24,421 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   }
 
   Future<void> _loadMealPlan() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      // Симулираме timeout за AI (10 сек.)
-      final userProfileService = UserProfileService();
-      final profile = await userProfileService.getUserProfile();
-      setState(() => _profile = profile);
-      if (profile == null) {
+    final userProfileService = context.read<UserProfileService>();
+    final userProfile = await userProfileService.getUserProfile();
+    if (userProfile != null) {
+      setState(() => _isLoading = true);
+      try {
+        final mealPlanGenerator = MealPlanGenerator(userProfileService);
+        final planData = await mealPlanGenerator.generateMealPlan(userProfile);
+        
+        // Convert the meal plan data to a list format for display
+        final List<Map<String, dynamic>> mealList = [];
+        final mealPlan = planData['mealPlan'] as Map<String, dynamic>;
+        
+        mealPlan.forEach((day, dayData) {
+          final dayMeals = dayData as Map<String, dynamic>;
+          dayMeals.forEach((mealType, mealData) {
+            if (mealData is Map<String, dynamic>) {
+              mealList.add({
+                'day': day,
+                'meal': mealType,
+                'name': mealData['name'] ?? 'Ястие',
+                'calories': mealData['calories'] ?? 0,
+                'description': mealData['description'] ?? 'Описание на ястието',
+                'ingredients': mealData['items'] ?? [],
+              });
+            }
+          });
+        });
+        
         setState(() {
-          _error = 'Потребителският профил не е намерен. Моля, попълнете целите си.';
+          _mealPlan = mealList;
           _isLoading = false;
         });
-        return;
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Грешка при зареждане на хранителния план: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-      final mealPlanGenerator = MealPlanGenerator(userProfileService);
-      final mealPlanData = await mealPlanGenerator.generateMealPlan(profile).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw Exception('AI отговорът отне твърде дълго. Опитайте отново.'),
-      );
-      setState(() {
-        _mealPlanData = mealPlanData;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.red.shade700,
-        elevation: 0,
-        title: const Text('Meal Plan', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _isLoading ? null : _loadMealPlan,
-            tooltip: 'Генерирай отново',
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFE53E3E),
+            Color(0xFFC53030),
+            Color(0xFF9B2C2C),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_menu,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ).animate().scale(duration: 600.ms).then().shake(),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Хранителен план',
+                          style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'Персонализирани ястия за теб',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_mealPlan.isNotEmpty)
+                    IconButton(
+                      onPressed: _loadMealPlan,
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                    ).animate().rotate(duration: 300.ms),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // Content
+              Expanded(
+                child: _isLoading
+                    ? _buildLoadingState()
+                    : _mealPlan.isEmpty
+                        ? _buildEmptyState()
+                        : _buildMealPlanList(),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 3,
+            ),
+          ).animate().scale(duration: 1000.ms),
+          const SizedBox(height: 24),
+          Text(
+            'Генерираме твоя хранителен план...',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ).animate().fadeIn(duration: 600.ms, delay: 500.ms),
         ],
       ),
-      body: _isLoading
-          ? Center(
-              child: Column(
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Animated Icon
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(60),
+            ),
+            child: const Icon(
+              Icons.restaurant_menu,
+              size: 60,
+              color: Colors.white,
+            ),
+          ).animate()
+            .scale(duration: 800.ms)
+            .then()
+            .shake(duration: 600.ms)
+            .then()
+            .scale(duration: 400.ms),
+
+          const SizedBox(height: 32),
+
+          // Title
+          Text(
+            'Нямаш хранителен план',
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ).animate().fadeIn(duration: 600.ms, delay: 400.ms).slideY(begin: 0.3),
+
+          const SizedBox(height: 16),
+
+          // Description
+          Text(
+            'Първо настрой профила си, за да ти създадем\nперсонализиран хранителен план',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ).animate().fadeIn(duration: 600.ms, delay: 600.ms).slideY(begin: 0.3),
+
+          const SizedBox(height: 40),
+
+          // Action Button
+          Container(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                // Navigate to goals screen to set up profile
+                // This would typically use navigation
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFFE53E3E),
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                shadowColor: Colors.black.withOpacity(0.2),
+              ),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Генерираме твоя план...', style: TextStyle(color: Colors.red.shade700)),
-                ],
-              ),
-            )
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 48),
-                      const SizedBox(height: 16),
-                      Text(
-                        _error!,
-                        style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: _loadMealPlan,
-                        child: const Text('Опитай отново'),
-                      ),
-                    ],
+                  const Icon(Icons.settings, size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Настрой профила',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                )
-              : _mealPlanData == null
-                  ? Center(
-                      child: Text('Няма наличен план. Попълнете целите си.',
-                          style: TextStyle(color: Colors.red.shade700)),
-                    )
-                  : _buildMealPlanView(),
-    );
-  }
-
-  Widget _buildMealPlanView() {
-    final mealPlan = _mealPlanData!['mealPlan'] as Map<String, dynamic>;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            Icon(Icons.calendar_month, color: Colors.red.shade700),
-            const SizedBox(width: 8),
-            Text('Твоят седмичен план',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red.shade700)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...mealPlan.entries.map((entry) => _buildDayCard(entry.key, entry.value)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildDayCard(String day, dynamic data) {
-    return Card(
-      color: Colors.red.shade50,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(day,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red.shade700)),
-            const SizedBox(height: 8),
-            ...['breakfast', 'lunch', 'dinner', 'snacks'].where((k) => data[k] != null).map((mealType) {
-              final meal = data[mealType];
-              if (meal is List) {
-                // snacks
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: meal.map<Widget>((snack) => _buildMealTile(snack)).toList(),
-                );
-              } else {
-                return _buildMealTile(meal);
-              }
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMealTile(dynamic meal) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: ListTile(
-        leading: Icon(Icons.restaurant_menu, color: Colors.red.shade400),
-        title: Text(meal['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${meal['calories'].toStringAsFixed(0)} kcal'),
-        trailing: Icon(Icons.arrow_forward_ios, color: Colors.red.shade200, size: 16),
-        onTap: () {
-          // Може да се покаже детайл за ястието
-          showDialog(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: Text(meal['name']),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Калории: ${meal['calories'].toStringAsFixed(0)}'),
-                  Text('Протеин: ${meal['protein'].toStringAsFixed(1)}g'),
-                  Text('Въглехидрати: ${meal['carbs'].toStringAsFixed(1)}g'),
-                  Text('Мазнини: ${meal['fat'].toStringAsFixed(1)}g'),
-                  const SizedBox(height: 8),
-                  if (meal['items'] != null)
-                    ...List.generate(meal['items'].length, (i) => Text('- ${meal['items'][i]['name']}')),
                 ],
               ),
-              actions: [
-                TextButton(
-                  child: const Text('Затвори'),
-                  onPressed: () => Navigator.of(context).pop(),
+            ),
+          ).animate().fadeIn(duration: 600.ms, delay: 800.ms).slideY(begin: 0.3),
+
+          const SizedBox(height: 20),
+
+          // Alternative Action
+          Container(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _loadMealPlan,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white, width: 2),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.auto_awesome, size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Генерирай с AI',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 600.ms, delay: 1000.ms).slideY(begin: 0.3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMealPlanList() {
+    return ListView.builder(
+      itemCount: _mealPlan.length,
+      itemBuilder: (context, index) {
+        final meal = _mealPlan[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53E3E).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _getMealIcon(meal['meal']),
+                        color: const Color(0xFFE53E3E),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        meal['meal'] ?? 'Ястие',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53E3E),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${meal['calories'] ?? 0} ккал',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  meal['name'] ?? 'Ястие',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  meal['description'] ?? 'Описание на ястието',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                if (meal['ingredients'] != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Съставки:',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: (meal['ingredients'] as List<dynamic>).map((ingredient) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          ingredient.toString(),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
-          );
-        },
-      ),
+          ),
+        ).animate().fadeIn(duration: 600.ms, delay: (index * 100).ms).slideY(begin: 0.3);
+      },
     );
+  }
+
+  IconData _getMealIcon(String? mealType) {
+    switch (mealType?.toLowerCase()) {
+      case 'закуска':
+        return Icons.wb_sunny;
+      case 'обяд':
+        return Icons.restaurant;
+      case 'вечеря':
+        return Icons.nights_stay;
+      case 'закуска':
+        return Icons.coffee;
+      default:
+        return Icons.restaurant_menu;
+    }
   }
 } 
