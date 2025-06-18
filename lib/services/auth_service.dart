@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 
-class AuthService {
+class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
@@ -19,10 +20,12 @@ class AuthService {
     String password,
   ) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      final result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      notifyListeners();
+      return result;
     } catch (e) {
       rethrow;
     }
@@ -34,10 +37,12 @@ class AuthService {
     String password,
   ) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      final result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      notifyListeners();
+      return result;
     } catch (e) {
       rethrow;
     }
@@ -57,7 +62,9 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      return await _auth.signInWithCredential(credential);
+      final result = await _auth.signInWithCredential(credential);
+      notifyListeners();
+      return result;
     } catch (e) {
       rethrow;
     }
@@ -70,6 +77,7 @@ class AuthService {
         _auth.signOut(),
         _googleSignIn.signOut(),
       ]);
+      notifyListeners();
     } catch (e) {
       rethrow;
     }

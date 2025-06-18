@@ -1,154 +1,104 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
-
-  @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  // Removed form key and previous onboarding variables as they are no longer needed for this design.
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF8A0720), // Dark Red
-              Color(0xFF4C004C), // Dark Purple
+              Color(0xFFE53E3E),
+              Color(0xFFC53030),
+              Color(0xFF9B2C2C),
             ],
           ),
         ),
         child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(flex: 2),
-              Column(
-                children: [
-                  Icon(
-                    Icons.restaurant, // Changed to a food-related icon
-                    size: 80,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(60),
+                  ),
+                  child: const Icon(
+                    Icons.restaurant_menu,
+                    size: 60,
                     color: Colors.white,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'FOOD TRACK', // Changed text to be relevant for food app
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2.0,
-                    ),
+                ).animate()
+                  .scale(duration: 800.ms)
+                  .then()
+                  .shake(duration: 600.ms),
+
+                const SizedBox(height: 32),
+
+                // Title
+                Text(
+                  'Food Track',
+                  style: GoogleFonts.inter(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                ],
-              ),
-              const Spacer(flex: 1),
-              const Text(
-                'Welcome Back',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 48),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48.0),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFFD32F2F), // Red for button
-                        Color(0xFF8B008B), // Purple for button
-                      ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(25.0),
+                ).animate().fadeIn(duration: 600.ms, delay: 400.ms).slideY(begin: 0.3),
+
+                const SizedBox(height: 16),
+
+                // Subtitle
+                Text(
+                  'Твоят персонализиран хранителен план',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    color: Colors.white.withOpacity(0.8),
                   ),
+                ).animate().fadeIn(duration: 600.ms, delay: 600.ms).slideY(begin: 0.3),
+
+                const SizedBox(height: 60),
+
+                // Get Started Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed: () {
                       context.go('/login');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFE53E3E),
+                      elevation: 8,
+                      shadowColor: Colors.black.withOpacity(0.2),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25.0),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      padding: EdgeInsets.zero,
                     ),
-                    child: const Text(
-                      'SIGN IN',
-                      style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                    child: Text(
+                      'Започни',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 48.0),
-                child: OutlinedButton(
-                  onPressed: () {
-                    context.go('/register');
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: Colors.white, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25.0),
-                    ),
-                    backgroundColor: Colors.transparent, // Transparent background
-                  ),
-                  child: const Text(
-                    'SIGN UP',
-                    style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const Spacer(flex: 2),
-              Column(
-                children: [
-                  const Text(
-                    'Login with Social Media',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Placeholder for social media icons
-                      IconButton(
-                        icon: const Icon(Icons.apple, color: Colors.white, size: 30), // Example: Apple/Instagram
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 24),
-                      IconButton(
-                        icon: const Icon(Icons.facebook, color: Colors.white, size: 30), // Example: Facebook
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 24),
-                      IconButton(
-                        icon: const Icon(Icons.mail, color: Colors.white, size: 30), // Example: Google/Twitter
-                        onPressed: () {},
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 48), // Padding at the bottom
-            ],
+                ).animate().fadeIn(duration: 600.ms, delay: 800.ms).slideY(begin: 0.3),
+              ],
+            ),
           ),
         ),
       ),

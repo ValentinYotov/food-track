@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 
-class UserProfileService {
+class UserProfileService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -32,6 +33,7 @@ class UserProfileService {
           .collection('user_profiles')
           .doc(userId)
           .set(profile.toJson());
+      notifyListeners();
     } catch (e) {
       print('Error saving user profile: $e');
       rethrow;
@@ -48,6 +50,7 @@ class UserProfileService {
           .collection('user_profiles')
           .doc(userId)
           .update(updates);
+      notifyListeners();
     } catch (e) {
       print('Error updating user profile: $e');
       rethrow;
@@ -61,6 +64,7 @@ class UserProfileService {
       if (userId == null) throw Exception('User not authenticated');
 
       await _firestore.collection('user_profiles').doc(userId).delete();
+      notifyListeners();
     } catch (e) {
       print('Error deleting user profile: $e');
       rethrow;

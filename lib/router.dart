@@ -27,7 +27,7 @@ final router = GoRouter(
     }
 
     if (isLoggedIn && isAuthRoute) {
-      return '/home/goals';
+      return '/home';
     }
 
     return null;
@@ -49,28 +49,9 @@ final router = GoRouter(
       path: '/reset-password',
       builder: (context, state) => const ResetPasswordScreen(),
     ),
-    ShellRoute(
-      builder: (context, state, child) {
-        return MainWrapper(child: child);
-      },
-      routes: [
-        GoRoute(
-          path: '/home/goals',
-          builder: (context, state) => const GoalsScreen(),
-        ),
-        GoRoute(
-          path: '/home/meal-plan',
-          builder: (context, state) => const MealPlanScreen(),
-        ),
-        GoRoute(
-          path: '/home/shopping-list',
-          builder: (context, state) => const ShoppingListScreen(),
-        ),
-        GoRoute(
-          path: '/home/settings',
-          builder: (context, state) => const SettingsScreen(),
-        ),
-      ],
+    GoRoute(
+      path: '/home',
+      builder: (context, state) => const MainWrapper(),
     ),
     GoRoute(
       path: '/recipe/:id',
